@@ -16,6 +16,14 @@ const (
 	Transient
 )
 
+type AckType int
+
+const (
+	Ack AckType = iota
+	NackRequeue
+	NackDiscard
+)
+
 func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
 	jsonVal, err := json.Marshal(val)
 	if err != nil {
@@ -84,7 +92,7 @@ func SubscribeJSON[T any](
 	queueName,
 	key string,
 	queueType SimpleQueueType,
-	handler func(T),
+	handler func(T) AckType,
 ) error {
 	ch, queue, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
@@ -107,13 +115,27 @@ func SubscribeJSON[T any](
 	go func() {
 		for message := range deliveryCh {
 			var body T
+
 			err = json.Unmarshal(message.Body, &body)
 			if err != nil {
 				log.Printf("subscribeJSON: %s\n", err)
 				continue
 			}
-			handler(body)
-			err = message.Ack(false)
+
+			ack := handler(body)
+			switch ack {
+			case Ack:
+				log.Println("Ack")
+				err = message.Ack(false)
+			case NackRequeue:
+				log.Println("NackRequeue")
+				err = message.Nack(false, true)
+			case NackDiscard:
+				log.Println("NackDiscard")
+				err = message.Nack(false, false)
+			default:
+				err = fmt.Errorf("invalid AckType: %v", ack)
+			}
 			if err != nil {
 				log.Printf("subscribeJSON: %s\n", err)
 			}

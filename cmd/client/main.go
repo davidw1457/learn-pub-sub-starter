@@ -65,10 +65,7 @@ func main() {
 		fmt.Sprintf("%s.%s", routing.ArmyMovesPrefix, userName),
 		fmt.Sprintf("%s.*", routing.ArmyMovesPrefix),
 		pubsub.Transient,
-		func(move gamelogic.ArmyMove) {
-			_ = gameState.HandleMove(move)
-			fmt.Print("> ")
-		},
+		handlerMove(gameState),
 	)
 	if err != nil {
 		log.Fatalln(err)
