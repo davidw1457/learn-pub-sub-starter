@@ -42,6 +42,18 @@ func main() {
 
 	gameState := gamelogic.NewGameState(userName)
 
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilDirect,
+		fmt.Sprintf("%s.%s", routing.PauseKey, userName),
+		routing.PauseKey,
+		pubsub.Transient,
+		handlerPause(gameState),
+	)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 gameloop:
 	for {
 		input := gamelogic.GetInput()

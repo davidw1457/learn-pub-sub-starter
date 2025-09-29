@@ -29,6 +29,17 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	_, _, err = pubsub.DeclareAndBind(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		fmt.Sprintf("%s.*", routing.GameLogSlug),
+		pubsub.Durable,
+	)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	gamelogic.PrintServerHelp()
 
 gameloop:
