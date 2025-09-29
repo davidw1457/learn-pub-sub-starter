@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
@@ -33,7 +31,7 @@ func main() {
 
 	gamelogic.PrintServerHelp()
 
-game:
+gameloop:
 	for {
 		input := gamelogic.GetInput()
 		if len(input) == 0 {
@@ -71,15 +69,9 @@ game:
 			}
 		case "quit":
 			fmt.Println("exiting game")
-			break game
+			break gameloop
 		default:
 			fmt.Printf("unknown command: %s\n", input[0])
 		}
 	}
-
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
-	<-signalChan
-
-	fmt.Println("Signal received. Shutting down server...")
 }
