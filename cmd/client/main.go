@@ -77,7 +77,7 @@ func main() {
 		"war",
 		fmt.Sprintf("%s.*", routing.WarRecognitionsPrefix),
 		pubsub.Durable,
-		handlerAllWar(gameState),
+		handlerWar(gameState, ch),
 	)
 	if err != nil {
 		log.Fatalln(err)
