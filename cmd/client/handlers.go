@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
@@ -75,7 +76,15 @@ func handlerWar(
 		case gamelogic.WarOutcomeYouWon:
 			err := pubsub.PublishGameLog(
 				ch,
-				fmt.Sprintf("%s won a war against %s", winner, loser),
+				routing.GameLog{
+					CurrentTime: time.Now(),
+					Message: fmt.Sprintf(
+						"%s won a war against %s",
+						winner,
+						loser,
+					),
+					Username: row.Attacker.Username,
+				},
 				row.Attacker.Username,
 			)
 			if err != nil {
@@ -86,7 +95,15 @@ func handlerWar(
 		case gamelogic.WarOutcomeDraw:
 			err := pubsub.PublishGameLog(
 				ch,
-				fmt.Sprintf("%s and %s resulted in a draw", winner, loser),
+				routing.GameLog{
+					CurrentTime: time.Now(),
+					Message: fmt.Sprintf(
+						"%s and %s resulted in a draw",
+						winner,
+						loser,
+					),
+					Username: row.Attacker.Username,
+				},
 				row.Attacker.Username,
 			)
 			if err != nil {

@@ -178,7 +178,11 @@ func PublishGob[T any](ch *amqp.Channel, exchange, key string, val T) error {
 	return nil
 }
 
-func PublishGameLog(ch *amqp.Channel, message, username string) error {
+func PublishGameLog(
+	ch *amqp.Channel,
+	message routing.GameLog,
+	username string,
+) error {
 	err := PublishGob(
 		ch,
 		routing.ExchangePerilTopic,
@@ -188,6 +192,67 @@ func PublishGameLog(ch *amqp.Channel, message, username string) error {
 	if err != nil {
 		return fmt.Errorf("publishGameLog: %w", err)
 	}
+
+	return nil
+}
+
+func SubscribeGob[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType,
+	handler func(T) AckType,
+) error {
+	ch, queue, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
+	if err != nil {
+		return fmt.Errorf("subscribeGob: %w", err)
+	}
+
+	deliveryCh, err := ch.Consume(
+		queue.Name,
+		"",
+		false,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("subscribeGob: %w", err)
+	}
+
+	go func() {
+		for message := range deliveryCh {
+			var body T
+
+			decoder := gob.NewDecoder(bytes.NewBuffer(message.Body))
+
+			err = decoder.Decode(&body)
+			if err != nil {
+				log.Printf("subscribeGob: %s\n", err)
+				continue
+			}
+
+			ack := handler(body)
+			switch ack {
+			case Ack:
+				log.Println("Ack")
+				err = message.Ack(false)
+			case NackRequeue:
+				log.Println("NackRequeue")
+				err = message.Nack(false, true)
+			case NackDiscard:
+				log.Println("NackDiscard")
+				err = message.Nack(false, false)
+			default:
+				err = fmt.Errorf("invalid AckType: %v", ack)
+			}
+			if err != nil {
+				log.Printf("subscribeGob: %s\n", err)
+			}
+		}
+	}()
 
 	return nil
 }

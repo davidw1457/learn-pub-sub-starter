@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
@@ -120,7 +122,32 @@ gameloop:
 		case "help":
 			gamelogic.PrintClientHelp()
 		case "spam":
-			fmt.Println("Spamming not allowed yet!")
+			if len(input) < 2 {
+				fmt.Println("Invalid input")
+				break
+			}
+
+			count, err := strconv.Atoi(input[1])
+			if err != nil {
+				fmt.Println(err)
+				break
+			}
+
+			for i := 0; i < count; i++ {
+				message := gamelogic.GetMaliciousLog()
+				err = pubsub.PublishGameLog(
+					ch,
+					routing.GameLog{
+						CurrentTime: time.Now(),
+						Message:     message,
+						Username:    gameState.Player.Username,
+					},
+					gameState.Player.Username,
+				)
+				if err != nil {
+					fmt.Println(err)
+				}
+			}
 		case "quit":
 			gamelogic.PrintQuit()
 			break gameloop

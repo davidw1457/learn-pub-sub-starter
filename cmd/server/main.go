@@ -40,6 +40,28 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	err = pubsub.SubscribeGob(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		"*",
+		pubsub.Durable,
+		func(message routing.GameLog) pubsub.AckType {
+			defer fmt.Print("> ")
+
+			err := gamelogic.WriteLog(message)
+			if err != nil {
+				log.Println(err)
+				return pubsub.NackRequeue
+			}
+
+			return pubsub.Ack
+		},
+	)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	gamelogic.PrintServerHelp()
 
 gameloop:
