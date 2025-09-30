@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"log"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/davidw1457/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/davidw1457/learn-pub-sub-starter/internal/pubsub"
@@ -20,17 +23,58 @@ func handlerPause(
 
 func handlerMove(
 	gs *gamelogic.GameState,
+	ch *amqp.Channel,
 ) func(gamelogic.ArmyMove) pubsub.AckType {
 	return func(move gamelogic.ArmyMove) pubsub.AckType {
 		outcome := gs.HandleMove(move)
-		fmt.Print("> ")
+		defer fmt.Print("> ")
 		switch outcome {
 		case gamelogic.MoveOutComeSafe:
-			fallthrough
+			return pubsub.Ack
 		case gamelogic.MoveOutcomeMakeWar:
+			err := pubsub.PublishJSON(
+				ch,
+				routing.ExchangePerilTopic,
+				fmt.Sprintf(
+					"%s.%s",
+					routing.WarRecognitionsPrefix,
+					gs.Player.Username,
+				),
+				gamelogic.RecognitionOfWar{
+					Attacker: move.Player,
+					Defender: gs.Player,
+				},
+			)
+			if err != nil {
+				log.Printf("handlerMove: %s\n", err)
+				return pubsub.NackRequeue
+			}
 			return pubsub.Ack
 		case gamelogic.MoveOutcomeSamePlayer:
 			fallthrough
+		default:
+			return pubsub.NackDiscard
+		}
+	}
+}
+
+func handlerAllWar(
+	gs *gamelogic.GameState,
+) func(gamelogic.RecognitionOfWar) pubsub.AckType {
+	return func(row gamelogic.RecognitionOfWar) pubsub.AckType {
+		defer fmt.Print("> ")
+		outcome, _, _ := gs.HandleWar(row)
+		switch outcome {
+		case gamelogic.WarOutcomeNotInvolved:
+			return pubsub.NackRequeue
+		case gamelogic.WarOutcomeNoUnits:
+			return pubsub.NackDiscard
+		case gamelogic.WarOutcomeOpponentWon:
+			return pubsub.Ack
+		case gamelogic.WarOutcomeYouWon:
+			return pubsub.Ack
+		case gamelogic.WarOutcomeDraw:
+			return pubsub.Ack
 		default:
 			return pubsub.NackDiscard
 		}
